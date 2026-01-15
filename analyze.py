@@ -3,6 +3,8 @@ import os
 from typing import Any, Dict
 from litellm import completion
 from dotenv import load_dotenv
+import logging
+from pydantic import ValidationError, TypedDict
 
 # You can replace these with other models as needed but this is the one we suggest for this lab.
 MODEL = "groq/llama-3.3-70b-versatile"
@@ -19,6 +21,11 @@ Always return valid JSON only, no additional text."""
 load_dotenv()
 api_key = os.getenv("GROQ_API_KEY")
 
+class TravelItinerary(TypedDict):
+    destination: str
+    price_range: str
+    ideal_visit_times: str
+    top_attractions: str 
 
 def get_itinerary(destination: str) -> Dict[str, Any]:
     """
@@ -42,20 +49,11 @@ def get_itinerary(destination: str) -> Dict[str, Any]:
             {"role": "user", "content": "Generate a travel itinerary for the destination: " + destination}
         ]
     ) 
-
-    data = json.loads(response.choices[0].message.content)  
-    
-    if not validate_schema(data):
+    try:    
+        data = json.loads(response.choices[0].message.content)  
+        return TravelItinerary(**data)
+    except (json.JSONDecodeError, ValidationError):
+        # TODO: Can add retry logic here if needed
         raise ValueError("Invalid response schema")
-  
-    return data
 
-def validate_schema(data: Dict[str, Any]) -> bool:
-    """
-    Validates the schema of the response
-    """
-    if not isinstance(data, dict):
-        return False
-    if not all(key in data.keys() for key in ["destination", "price_range", "ideal_visit_times", "top_attractions"]):
-        return False
-    return True
+# curl "http://localhost:8000/api/v1/itinerary?destination=Paris"
